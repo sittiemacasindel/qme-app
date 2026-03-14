@@ -4,234 +4,406 @@ import "./Home.css";
 
 interface Profile {
   username: string;
+  full_name: string;
   email: string;
+  role: string;
+  avatar_url: string | null;
 }
 
-function Home() {
+interface Queue {
+  id: number;
+  name: string;
+  description: string;
+  code: string;
+  status: "Active" | "Paused";
+  waiting: number;
+}
+
+interface HomeProps {
+  onNavigateToProfile: () => void;
+}
+
+// Start with empty — data will come from Supabase when the queues table is ready
+const DEMO_QUEUES: Queue[] = [];
+
+function Home({ onNavigateToProfile }: HomeProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [queues, setQueues] = useState<Queue[]>(DEMO_QUEUES);
+  const [activeNav, setActiveNav] = useState("dashboard");
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
           .from("profiles")
-          .select("username, email")
+          .select("username, full_name, email, role, avatar_url")
           .eq("id", user.id)
-          .single();
-
+          .maybeSingle();
         if (data) setProfile(data);
-        else setProfile({ username: user.email ?? "Admin", email: user.email ?? "" });
+        else setProfile({
+          username: user.user_metadata?.username ?? user.email ?? "Admin",
+          full_name: user.user_metadata?.full_name ?? "",
+          email: user.email ?? "",
+          role: "Manager",
+          avatar_url: null,
+        });
       }
       setLoadingProfile(false);
     };
-
     fetchProfile();
   }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
     await supabase.auth.signOut();
-    // App.tsx's onAuthStateChange listener will redirect back to login
   };
 
-  const stats = [
-    { label: "Active Queues", value: "—", icon: "🎟️", color: "#6366f1" },
-    { label: "Customers Served", value: "—", icon: "👥", color: "#10b981" },
-    { label: "Avg. Wait Time", value: "—", icon: "⏱️", color: "#f59e0b" },
-    { label: "Satisfaction Rate", value: "—", icon: "⭐", color: "#ec4899" },
-  ];
+  const getInitials = () => {
+    const name = profile?.full_name || profile?.username || "";
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "A";
+  };
+
+  const displayName = loadingProfile ? "…" : (profile?.full_name || profile?.username || "Admin");
+  // Placeholders — replace with real Supabase queries when the queues table exists
+  const activeQueues = "—";
+  const totalWaiting = "—";
+  const totalServed = "—";
+
+  const toggleStatus = (id: number) => {
+    setQueues((prev) =>
+      prev.map((q) =>
+        q.id === id ? { ...q, status: q.status === "Active" ? "Paused" : "Active" } : q
+      )
+    );
+  };
+
+  const closeQueue = (id: number) => {
+    setQueues((prev) => prev.filter((q) => q.id !== id));
+  };
 
   return (
-    <div className="dashboard">
-      {/* ── Sidebar ── */}
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <img src="/Qme_Logo.png" alt="QMe Logo" className="sidebar-logo-img" />
-          <span className="sidebar-logo-text">QMe</span>
+    <div className="app-shell">
+      {/* ── Breadcrumb ── */}
+      <div className="breadcrumb-bar">Main Dashboard</div>
+
+      <div className="app-body">
+        {/* ── Narrow Icon Sidebar ── */}
+        <aside className="icon-sidebar">
+          <div className="icon-sidebar-logo">
+            <img src="/Qme_Logo.png" alt="QMe" className="icon-sidebar-logo-img" />
+          </div>
+
+          <nav className="icon-nav">
+            <button
+              className={`icon-nav-btn ${activeNav === "dashboard" ? "active" : ""}`}
+              onClick={() => setActiveNav("dashboard")}
+              title="Dashboard"
+            >
+              <HomeIcon />
+            </button>
+            <button
+              className={`icon-nav-btn ${activeNav === "queues" ? "active" : ""}`}
+              onClick={() => setActiveNav("queues")}
+              title="Queues"
+            >
+              <QueueListIcon />
+            </button>
+            <button
+              className={`icon-nav-btn ${activeNav === "analytics" ? "active" : ""}`}
+              onClick={() => setActiveNav("analytics")}
+              title="Analytics"
+            >
+              <AnalyticsIcon />
+            </button>
+            <button
+              className="icon-nav-btn"
+              onClick={onNavigateToProfile}
+              title="Profile"
+            >
+              <ProfileIcon />
+            </button>
+          </nav>
+
+          <div className="icon-sidebar-bottom">
+            <button
+              className="icon-nav-btn icon-nav-btn--logout"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              title="Sign out"
+            >
+              {loggingOut ? <span className="spinner-icon" /> : <LogoutIcon />}
+            </button>
+          </div>
+        </aside>
+
+        {/* ── Right Panel ── */}
+        <div className="right-panel">
+          {/* ── App Header ── */}
+          <header className="app-header">
+            <div className="app-header-brand">
+              <span className="app-header-logo-text">QME</span>
+            </div>
+
+            <div className="app-header-right">
+              <button className="bell-btn" title="Notifications">
+                <BellIcon />
+                <span className="bell-dot" />
+              </button>
+              <div className="header-user-block">
+                <span className="header-user-name">{displayName}</span>
+                <span className="header-user-role">{profile?.role || "Manager"}</span>
+              </div>
+              <button className="header-avatar-btn" onClick={onNavigateToProfile} title="View Profile">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Avatar" className="header-avatar-img" />
+                ) : (
+                  <span className="header-avatar-initials">
+                    {loadingProfile ? "…" : getInitials()}
+                  </span>
+                )}
+              </button>
+            </div>
+          </header>
+
+          {/* ── Main Content ── */}
+          <main className="dash-main">
+            {/* Page Title Row */}
+            <div className="dash-title-row">
+              <div>
+                <h1 className="dash-title">Queue Dashboard</h1>
+                <p className="dash-subtitle">Manage your active queues</p>
+              </div>
+              <button className="create-queue-btn">
+                <PlusIcon /> Create Queue
+              </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="stats-row">
+              <div className="stat-card">
+                <div className="stat-icon-box stat-icon-box--blue">
+                  <BarChartIcon />
+                </div>
+                <div className="stat-body">
+                  <span className="stat-num stat-num--placeholder">{activeQueues}</span>
+                  <span className="stat-lbl">Active Queues</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon-box stat-icon-box--teal">
+                  <PeopleIcon />
+                </div>
+                <div className="stat-body">
+                  <span className="stat-num stat-num--placeholder">{totalWaiting}</span>
+                  <span className="stat-lbl">Customers Waiting</span>
+                  <span className="stat-sublbl">Across all active queues</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon-box stat-icon-box--green">
+                  <ClockCircleIcon />
+                </div>
+                <div className="stat-body">
+                  <span className="stat-num stat-num--placeholder">{totalServed}</span>
+                  <span className="stat-lbl">Total Served Today</span>
+                </div>
+              </div>
+            </div>
+
+            {/* My Queues Table */}
+            <div className="queues-card">
+              <div className="queues-card-head">
+                <div>
+                  <h2 className="queues-card-title">My Queues</h2>
+                  <p className="queues-card-sub">No queues yet</p>
+                </div>
+              </div>
+
+              <div className="table-wrapper">
+                <table className="queues-table">
+                  <thead>
+                    <tr>
+                      <th>QUEUE NAME</th>
+                      <th>QUEUE CODE</th>
+                      <th>STATUS</th>
+                      <th>WAITING</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queues.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="table-empty">
+                          <div className="empty-state">
+                            <span className="empty-state-icon">🎟️</span>
+                            <p className="empty-state-msg">No existing queues</p>
+                            <p className="empty-state-sub">Create your first queue to start managing customers.</p>
+                            <button className="create-queue-btn empty-state-btn">
+                              <PlusIcon /> Create Queue
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      queues.map((queue) => (
+                        <tr key={queue.id}>
+                          <td>
+                            <div className="q-name">{queue.name}</div>
+                            <div className="q-desc">{queue.description}</div>
+                          </td>
+                          <td>
+                            <span className="q-code">{queue.code}</span>
+                          </td>
+                          <td>
+                            <span className={`q-status q-status--${queue.status.toLowerCase()}`}>
+                              <span className="q-status-dot" />
+                              {queue.status}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="q-waiting">{queue.waiting} people</span>
+                          </td>
+                          <td>
+                            <div className="q-actions">
+                              <button className="q-btn q-btn--view">
+                                <EyeSmIcon /> View
+                              </button>
+                              <button
+                                className={`q-btn ${queue.status === "Active" ? "q-btn--pause" : "q-btn--resume"}`}
+                                onClick={() => toggleStatus(queue.id)}
+                              >
+                                {queue.status === "Active" ? (
+                                  <><PauseIcon /> Pause</>
+                                ) : (
+                                  <><PlayIcon /> Resume</>
+                                )}
+                              </button>
+                              <button
+                                className="q-btn q-btn--close"
+                                onClick={() => closeQueue(queue.id)}
+                              >
+                                <XIcon /> Close
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </main>
         </div>
-
-        <nav className="sidebar-nav">
-          <a href="#dashboard" className="nav-item active">
-            <span className="nav-icon">🏠</span>
-            <span>Dashboard</span>
-          </a>
-          <a href="#queues" className="nav-item">
-            <span className="nav-icon">🎟️</span>
-            <span>Queues</span>
-          </a>
-          <a href="#analytics" className="nav-item">
-            <span className="nav-icon">📊</span>
-            <span>Analytics</span>
-          </a>
-          <a href="#clients" className="nav-item">
-            <span className="nav-icon">👥</span>
-            <span>Clients</span>
-          </a>
-          <a href="#settings" className="nav-item">
-            <span className="nav-icon">⚙️</span>
-            <span>Settings</span>
-          </a>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="user-avatar">
-              {loadingProfile ? "…" : (profile?.username?.[0] ?? "A").toUpperCase()}
-            </div>
-            <div className="user-info">
-              <span className="user-name">
-                {loadingProfile ? "Loading…" : profile?.username ?? "Admin"}
-              </span>
-              <span className="user-role">Administrator</span>
-            </div>
-          </div>
-          <button
-            className={`logout-btn ${loggingOut ? "loading" : ""}`}
-            onClick={handleLogout}
-            disabled={loggingOut}
-            title="Sign out"
-          >
-            {loggingOut ? <span className="spinner-sm" /> : <LogoutIcon />}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main Content ── */}
-      <main className="dashboard-main">
-        {/* Header */}
-        <header className="dashboard-header">
-          <div>
-            <h1 className="dashboard-heading">
-              Welcome back,{" "}
-              <span className="dashboard-username">
-                {loadingProfile ? "…" : profile?.username ?? "Admin"}
-              </span>{" "}
-              👋
-            </h1>
-            <p className="dashboard-subheading">
-              Here's a snapshot of your queue management system today.
-            </p>
-          </div>
-          <div className="header-badge">
-            <span className="status-dot" /> Live
-          </div>
-        </header>
-
-        {/* Stats Grid */}
-        <section className="stats-grid">
-          {stats.map((stat) => (
-            <div className="stat-card" key={stat.label}>
-              <div className="stat-icon" style={{ background: stat.color + "22", color: stat.color }}>
-                {stat.icon}
-              </div>
-              <div className="stat-info">
-                <span className="stat-value">{stat.value}</span>
-                <span className="stat-label">{stat.label}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* Profile Card */}
-        <section className="profile-section">
-          <div className="profile-card">
-            <div className="profile-card-header">
-              <h2 className="section-title">Account Details</h2>
-              <span className="profile-badge">Active</span>
-            </div>
-            {loadingProfile ? (
-              <p className="profile-loading">Loading profile…</p>
-            ) : (
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <span className="profile-field-label">
-                    <PersonIcon /> Username
-                  </span>
-                  <span className="profile-field-value">{profile?.username ?? "—"}</span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-label">
-                    <MailIcon /> Email
-                  </span>
-                  <span className="profile-field-value">{profile?.email ?? "—"}</span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-label">
-                    <ShieldIcon /> Role
-                  </span>
-                  <span className="profile-field-value">Administrator</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="quick-actions-card">
-            <h2 className="section-title">Quick Actions</h2>
-            <div className="quick-actions">
-              <button className="action-btn" style={{ "--accent": "#6366f1" } as React.CSSProperties}>
-                <span>🎟️</span>
-                <span>New Queue</span>
-              </button>
-              <button className="action-btn" style={{ "--accent": "#10b981" } as React.CSSProperties}>
-                <span>📢</span>
-                <span>Announce</span>
-              </button>
-              <button className="action-btn" style={{ "--accent": "#f59e0b" } as React.CSSProperties}>
-                <span>📊</span>
-                <span>View Report</span>
-              </button>
-              <button className="action-btn" style={{ "--accent": "#ec4899" } as React.CSSProperties}>
-                <span>⚙️</span>
-                <span>Settings</span>
-              </button>
-            </div>
-          </div>
-        </section>
-      </main>
+      </div>
     </div>
   );
 }
 
-/* ── Icons ── */
-function PersonIcon() {
+/* ── SVG Icons ── */
+function HomeIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   );
 }
-
-function MailIcon() {
+function QueueListIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
     </svg>
   );
 }
-
-function ShieldIcon() {
+function AnalyticsIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }
-
+function ProfileIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
 function LogoutIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+function BellIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+function BarChartIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+function PeopleIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+function ClockCircleIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+function EyeSmIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+function PauseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+    </svg>
+  );
+}
+function PlayIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+function XIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }

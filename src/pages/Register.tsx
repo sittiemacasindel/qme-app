@@ -8,6 +8,7 @@ interface RegisterProps {
 }
 
 function Register({ onNavigateToLogin, onRegisterSuccess }: RegisterProps) {
+    const [fullName, setFullName] = useState("");
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -22,8 +23,12 @@ function Register({ onNavigateToLogin, onRegisterSuccess }: RegisterProps) {
         setError("");
 
         // ── Client-side validation ──
-        if (!username.trim() || !email || !password || !confirmPassword) {
+        if (!fullName.trim() || !username.trim() || !email || !password || !confirmPassword) {
             setError("Please fill in all fields.");
+            return;
+        }
+        if (fullName.trim().length < 2) {
+            setError("Full name must be at least 2 characters.");
             return;
         }
         if (username.trim().length < 3) {
@@ -74,6 +79,7 @@ function Register({ onNavigateToLogin, onRegisterSuccess }: RegisterProps) {
                 password,
                 options: {
                     data: {
+                        full_name: fullName.trim(),
                         username: username.trim(),
                     },
                 },
@@ -96,8 +102,19 @@ function Register({ onNavigateToLogin, onRegisterSuccess }: RegisterProps) {
                 return;
             }
 
-            // ── Step 3: Profile row is auto-created by the DB trigger (handle_new_user) ──
-            // No manual insert needed — the trigger runs SECURITY DEFINER and bypasses RLS.
+            // ── Step 3: Write full_name to the profiles table ──
+            // The DB trigger creates the profiles row synchronously, so we can
+            // update it immediately after signUp succeeds.
+            const { error: profileError } = await supabase
+                .from("profiles")
+                .update({ full_name: fullName.trim() })
+                .eq("id", authData.user.id);
+
+            // Profile update failure is non-fatal — the account was still created.
+            // The user can set their full name later from the Profile page.
+            if (profileError) {
+                console.warn("Could not save full_name to profile:", profileError.message);
+            }
 
             // ── Success ──
             setSuccess(true);
@@ -158,6 +175,25 @@ function Register({ onNavigateToLogin, onRegisterSuccess }: RegisterProps) {
                                     <span className="login-error-icon">⚠</span> {error}
                                 </div>
                             )}
+
+                            {/* Full Name */}
+                            <div className="login-field">
+                                <label htmlFor="fullName">Full Name</label>
+                                <div className="input-wrapper">
+                                    <span className="input-icon">
+                                        <PersonIcon />
+                                    </span>
+                                    <input
+                                        id="fullName"
+                                        type="text"
+                                        placeholder="e.g. Juan dela Cruz"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        autoComplete="name"
+                                    />
+                                </div>
+                            </div>
 
                             {/* Username */}
                             <div className="login-field">

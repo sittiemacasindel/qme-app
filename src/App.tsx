@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
 import ProfilePage from "./pages/Profile";
+import Sidebar from "./components/Sidebar";
 
 type Page = "login" | "register" | "home" | "profile";
 
@@ -76,21 +77,11 @@ function App() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#f4f6fb", fontFamily: "'Inter', sans-serif" }}>
       <div style={{ padding: "5px 20px", background: "#eef0f5", borderBottom: "1px solid #e2e5ec", fontSize: "0.72rem", color: "#94a3b8", fontWeight: 500 }}>My Profile</div>
       <div style={{ display: "flex", flex: 1 }}>
-        <aside style={{ width: 62, background: "#1e2444", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", flexShrink: 0, minHeight: "100%" }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, overflow: "hidden" }}>
-            <img src="/Qme_Logo.png" alt="QMe" style={{ width: 28, height: 28, objectFit: "contain" }} />
-          </div>
-          {[
-            { icon: "🏠", label: "Dashboard", onClick: () => setPageSafe("home"), active: false },
-            { icon: "🎟️", label: "Queues", onClick: () => {}, active: false },
-            { icon: "📊", label: "Analytics", onClick: () => {}, active: false },
-            { icon: "👤", label: "Profile", onClick: () => {}, active: true },
-          ].map((item) => (
-            <button key={item.label} onClick={item.onClick} title={item.label} style={{ width: 44, height: 44, borderRadius: 12, border: "none", cursor: "pointer", background: item.active ? "#4361ee" : "transparent", color: item.active ? "#fff" : "#8b99c4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem", marginBottom: 4, boxShadow: item.active ? "0 4px 12px rgba(67,97,238,0.4)" : "none" }}>
-              {item.icon}
-            </button>
-          ))}
-        </aside>
+        <Sidebar
+          activeItem="profile"
+          onNavigateToDashboard={() => setPageSafe("home")}
+          onNavigateToProfile={() => {}}
+        />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <header style={{ height: 58, background: "#fff", borderBottom: "1px solid #e8eaf0", display: "flex", alignItems: "center", padding: "0 28px", boxShadow: "0 1px 4px rgba(0,0,0,0.05)", flexShrink: 0 }}>
             <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#1e293b", letterSpacing: "-0.5px" }}>QME</span>
